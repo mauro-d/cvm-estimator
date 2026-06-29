@@ -1,0 +1,57 @@
+{
+  "name": "cvm-estimator",
+  "version": "0.1.0",
+  "description": "Streaming distinct-elements estimator using the CVM algorithm — bounded memory with (ε, δ) accuracy guarantees. Stream, promise and core APIs.",
+  "type": "module",
+  "main": "./src/index.mjs",
+  "module": "./src/index.mjs",
+  "types": "./types/index.d.mts",
+  "exports": {
+    ".": {
+      "types": "./types/index.d.mts",
+      "import": "./src/index.mjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "src",
+    "!src/cvm-original.mjs",
+    "!src/errors.mjs",
+    "types",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node --test",
+    "test:watch": "node --test --watch",
+    "lint": "standard",
+    "lint:fix": "standard --fix",
+    "bench": "node bench/index.mjs",
+    "prepublishOnly": "npm run lint && npm test"
+  },
+  "keywords": [
+    "cvm",
+    "distinct",
+    "count-distinct",
+    "cardinality",
+    "streaming",
+    "stream",
+    "sketch",
+    "estimation",
+    "probabilistic",
+    "hyperloglog"
+  ],
+  "author": "Mauro <mauro.doganieri@gmail.com>",
+  "license": "ISC",
+  "devDependencies": {
+    "standard": "^17.1.2"
+  },
+  "standard": {
+    "ignore": [
+      "types/"
+    ]
+  }
+}
