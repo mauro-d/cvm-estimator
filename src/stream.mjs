@@ -3,10 +3,10 @@ import { CVM } from './cvm.mjs'
 
 const identity = (x) => x
 
-// Stream API: a Writable sink (object mode, one element per write) that estimates
-// distinct elements as you pipe into it. Read result() once it has finished. A
-// keyFn error surfaces once via the 'error' event, which also rejects pipeline()
-// / finished().
+// Stream API: a Writable sink (object mode, one value per write) that estimates
+// distinct values as you pipe into it. Read result() once it has finished. A
+// keyFn error surfaces once via the 'error' event, which also rejects
+// pipeline() / finished().
 export class DistinctEstimateStream extends Writable {
   constructor (options = {}) {
     const { keyFn = identity, objectMode = true, highWaterMark, ...cvmOptions } = options

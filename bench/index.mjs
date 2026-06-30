@@ -44,7 +44,7 @@ function runIsolated (kind, scenario) {
 }
 
 async function runScenario (scenario) {
-  console.log(`\n=== ${scenario.name}: ${scenario.total.toLocaleString()} elements, ~${scenario.unique.toLocaleString()} unique (ε=${scenario.epsilon}, δ=${scenario.delta}) ===`)
+  console.log(`\n=== ${scenario.name}: ${scenario.total.toLocaleString()} items, ~${scenario.unique.toLocaleString()} unique (ε=${scenario.epsilon}, δ=${scenario.delta}) ===`)
   // exact and cvm always run one after the other, never concurrently, so
   // neither run's measurement is skewed by the other contending for resources.
   for (const kind of /** @type {const} */(['exact', 'cvm'])) {
