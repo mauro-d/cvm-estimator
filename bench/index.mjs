@@ -1,19 +1,23 @@
 import { fork } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
+import { scenarios } from './scenarios.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
 
 /**
  * Run one engine in a forked process (with `--expose-gc`) so heap measurements
- * are clean and isolated from each other.
+ * are clean and isolated from each other. The scenario's parameters are passed
+ * as a JSON argument to the child, which has no defaults of its own. This is
+ * the only path that configures a benchmark run.
  *
  * @param {'cvm' | 'exact'} kind
+ * @param {{ total: number, unique: number, epsilon: number, delta: number, seed: number }} scenario
  * @returns {Promise<{ name: string, estimate: string, ram: number, ms: number }>}
  */
-function runIsolated (kind) {
+function runIsolated (kind, scenario) {
   return new Promise((resolve, reject) => {
-    const child = fork(join(here, 'worker.mjs'), [kind], {
+    const child = fork(join(here, 'worker.mjs'), [kind, JSON.stringify(scenario)], {
       execArgv: ['--expose-gc'],
       stdio: ['pipe', 'pipe', 'pipe', 'ipc']
     })
@@ -39,16 +43,26 @@ function runIsolated (kind) {
   })
 }
 
-async function main () {
-  console.log('=== CVM benchmark (isolated processes) ===')
+async function runScenario (scenario) {
+  console.log(`\n=== ${scenario.name}: ${scenario.total.toLocaleString()} elements, ~${scenario.unique.toLocaleString()} unique (ε=${scenario.epsilon}, δ=${scenario.delta}) ===`)
+  // exact and cvm always run one after the other, never concurrently, so
+  // neither run's measurement is skewed by the other contending for resources.
   for (const kind of /** @type {const} */(['exact', 'cvm'])) {
     try {
-      const r = await runIsolated(kind)
+      const r = await runIsolated(kind, scenario)
       const label = kind === 'exact' ? 'EXACT (Set) ' : 'CVM estimate'
       console.log(`[${label}] distinct: ${r.estimate} | RAM: ${r.ram} MB | time: ${r.ms} ms`)
     } catch (e) {
-      console.error(`error running '${kind}':`, e instanceof Error ? e.message : e)
+      console.error(`error running '${kind}' for scenario '${scenario.name}':`, e instanceof Error ? e.message : e)
     }
+  }
+}
+
+async function main () {
+  console.log('=== CVM benchmark (isolated processes) ===')
+  // Scenarios also run strictly one after another for the same reason.
+  for (const scenario of scenarios) {
+    await runScenario(scenario)
   }
 }
 

@@ -145,6 +145,37 @@ The quantity being estimated is `F0`, the number of distinct elements in a strea
 - **Total and unbiased.** It never fails (no `⊥` outcome), and `E[estimate] = F0`
   exactly, with no systematic over- or under-counting.
 
+## Benchmarks
+
+These numbers come from real runs and are meant to give a feel for the
+trade-off in practice. They don't prove the algorithm is correct: the paper
+does that.
+
+Memory and time at increasing scale (ε=0.05, δ=0.01 throughout):
+
+| Elements processed | Distinct values | `Set` memory | CVM memory | `Set` time | CVM time | Observed error |
+| --- | --- | --- | --- | --- | --- | --- |
+| 2M  | ~400K | ~30 MB  | ~5 MB  | <1 s | <1 s | 0.1% |
+| 10M | ~2M   | ~160 MB | ~6 MB  | ~5 s | ~2 s | 0.7% |
+| 50M | ~10M  | ~900 MB | ~10 MB | ~30 s | ~7 s | 0.5% |
+
+Memory stays nearly flat as distinct values grow; an exact `Set` grows with
+them.
+
+`epsilon` trades accuracy for memory directly, holding scale fixed at the 10M
+row above (~2 million distinct, δ=0.01):
+
+| epsilon | CVM memory | Observed error |
+| --- | --- | --- |
+| 0.05 | ~6 MB   | 0.7% |
+| 0.10 | ~1.7 MB | 0.3% |
+| 0.20 | ~0.6 MB | 2.1% |
+
+Memory and time vary by machine, Node version, and data shape. The observed
+error also varies from run to run, since the estimator isn't seeded by
+default. Run `npm run bench` to measure on your own setup; scenarios are
+defined in `bench/scenarios.mjs`.
+
 ## References
 
 - S. Chakraborty, N. V. Vinodchandran, K. S. Meel. *Distinct Elements in Streams:
