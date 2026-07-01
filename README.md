@@ -32,19 +32,14 @@ you already have, and resolves to the result:
 ```js
 import { estimateDistinct } from 'cvm-estimator'
 
-const values = ['apple', 'banana', 'apple', 'cherry', 'apple', 'pear']
-
 const { estimate } = await estimateDistinct(values, {
-  epsilon: 0.05,              // accuracy: within ±5% of the true count
-  delta: 0.01,                // reliability: may land outside ±5% at most 1% of the time
-  expectedSize: values.length // expected stream length; an upper bound is fine
+  epsilon: 0.05,          // accuracy: within ±5% of the true count
+  delta: 0.01,            // reliability: may land outside ±5% at most 1% of the time
+  expectedSize: 1_000_000 // expected stream length; an upper bound is fine
 })
 
-console.log(`≈ ${estimate} distinct values`) // 4
+console.log(`≈ ${estimate} distinct values`)
 ```
-
-Inputs this small are counted exactly; the result only becomes an estimate on
-larger streams (see [Result](#result)).
 
 ## Stream API — `DistinctEstimateStream`
 
@@ -53,25 +48,13 @@ multiple stream stages via `pipeline()` (parsing, decompression, other
 transforms feeding it). Read the result once it has finished:
 
 ```js
-import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import { DistinctEstimateStream } from 'cvm-estimator'
 
-const source = Readable.from(['apple', 'banana', 'apple', 'cherry'])
-const counter = new DistinctEstimateStream({ epsilon: 0.05, expectedSize: 4 })
-await pipeline(source, counter)
+const counter = new DistinctEstimateStream({ epsilon: 0.05, expectedSize: 1_000_000 })
+await pipeline(values, counter) // values: your source stream
 
 console.log(counter.result()) // { estimate, samples, threshold, p }
-```
-
-Counting distinct lines in a file:
-
-```js
-import { createReadStream } from 'node:fs'
-import { createInterface } from 'node:readline'
-
-const lines = createInterface({ input: createReadStream('access.log') })
-await pipeline(lines, new DistinctEstimateStream({ expectedSize: 1e6 }))
 ```
 
 By default the stream is in object mode: each write is one value of any type,
@@ -91,8 +74,8 @@ Drive the algorithm yourself, no I/O:
 ```js
 import { CVM } from 'cvm-estimator'
 
-const cvm = new CVM({ epsilon: 0.05, expectedSize: 1e6 })
-for (const value of source) {
+const cvm = new CVM({ epsilon: 0.05, expectedSize: 1_000_000 })
+for (const value of values) {
   cvm.add(value)
   console.log(cvm.distinct) // updates as values come in
 }
