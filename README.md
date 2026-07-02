@@ -1,7 +1,9 @@
-# tallyish
+# faircount
 
 Count the distinct values in a stream using only a small, fixed amount of memory.
-The result is an **estimate**, and you control how accurate it is.
+The result is an **estimate**, and a *fair* one — unbiased, so it is right on
+average, with proven bounds on how far off a single run may land and on how
+often that can happen.
 
 Counting every value exactly means remembering each one you see, so memory grows
 with how many distinct values appear. This library keeps a bounded random sample
@@ -13,13 +15,13 @@ thousand distinct values or a billion. You choose how close the estimate should 
 This library is a faithful implementation of the CVM algorithm (Chakraborty,
 Vinodchandran & Meel, [2022](https://arxiv.org/abs/2301.10191)), specifically the
 total, unbiased variant by Karayel et al.
-([ITP 2025](https://doi.org/10.4230/LIPIcs.ITP.2025.34)): it never fails, and its
-estimate is right on average.
+([ITP 2025](https://doi.org/10.4230/LIPIcs.ITP.2025.34)): it never fails, and the
+estimate's expected value is exactly the true count.
 
 ## Install
 
 ```sh
-npm install tallyish
+npm install faircount
 ```
 
 Requires Node 18 or newer. The library is published as ES modules only and has no
@@ -31,7 +33,7 @@ Accepts a single iterable (`Array`, `Set`, …), async iterable, or `Readable`
 you already have, and resolves to the result:
 
 ```js
-import { estimateDistinct } from 'tallyish'
+import { estimateDistinct } from 'faircount'
 
 const { estimate } = await estimateDistinct(values, {
   epsilon: 0.05,          // accuracy: within ±5% of the true count
@@ -50,7 +52,7 @@ transforms feeding it). Read the result once it has finished:
 
 ```js
 import { pipeline } from 'node:stream/promises'
-import { DistinctEstimateStream } from 'tallyish'
+import { DistinctEstimateStream } from 'faircount'
 
 const counter = new DistinctEstimateStream({ epsilon: 0.05, expectedSize: 1_000_000 })
 await pipeline(values, counter) // values: your source stream
@@ -73,7 +75,7 @@ new DistinctEstimateStream({ objectMode: false, keyFn: (chunk) => chunk.toString
 Drive the algorithm yourself, no I/O:
 
 ```js
-import { CVM } from 'tallyish'
+import { CVM } from 'faircount'
 
 const cvm = new CVM({ epsilon: 0.05, expectedSize: 1_000_000 })
 for (const value of values) {
@@ -95,8 +97,8 @@ There's no `keyFn` here: pass `add()` whatever value you want counted.
 Your source doesn't have to emit plain values directly. When it emits objects,
 both `estimateDistinct` and `DistinctEstimateStream` accept a `keyFn` that maps
 each item to the value whose distinctness you actually want to count. It must
-return a **primitive** (string/number): the engine dedups with a `Set`, so
-objects/arrays would be compared by reference and never dedup.
+return a **primitive** (typically a string or number): the engine dedups with a
+`Set`, so objects/arrays would be compared by reference and never dedup.
 
 ```js
 // distinct users
@@ -109,8 +111,8 @@ await estimateDistinct(orders, { keyFn: (o) => makeYourKey(o.user, o.product) })
 You write `makeYourKey` yourself: combine whatever fields define distinctness
 for your data (two, three, or more) into one primitive that never collides for
 two genuinely different inputs. Naive concatenation and `JSON.stringify` both
-have sharp edges (e.g. `null`, `undefined`, and `NaN` all serialize the same
-way). Test your own encoding against your actual data; don't assume a known
+have sharp edges (e.g. in a JSON array `null`, `undefined`, and `NaN` all
+serialize to `null`). Test your own encoding against your actual data; don't assume a known
 trick is automatically safe.
 
 ## Options
@@ -145,7 +147,7 @@ pass a seed for a deterministic `[0, 1)` sequence, or call it with no arguments
 to get `Math.random` itself.
 
 ```js
-import { createRandom } from 'tallyish'
+import { createRandom } from 'faircount'
 
 const a = createRandom(42)
 const b = createRandom(42)
@@ -156,8 +158,10 @@ createRandom() === Math.random // true: no seed, the real thing
 
 ## Errors
 
-The algorithm never fails (it is total). Errors only come from your data source or
-your `keyFn`, and travel on a single channel:
+The algorithm never fails (it is total). Invalid options throw a `RangeError` or a
+`TypeError` as soon as the estimator is created (in the Promise API the returned
+promise rejects instead). Past that point, errors only come from your data source
+or your `keyFn`, and travel on a single channel:
 
 - **Promise API** — the promise rejects.
 - **Stream API** — the `'error'` event fires, which also rejects `pipeline()` / `finished()`.
@@ -167,29 +171,29 @@ your `keyFn`, and travel on a single channel:
 The quantity being estimated is `F0`, the number of distinct values in a stream.
 
 - **Bounded memory.** Instead of remembering every distinct value, the algorithm
-  keeps a random sample capped at `n = ⌈(12/ε²)·ln(3m/δ)⌉` entries
-  (`O((1/ε²)·log(m/δ))` space), however many distinct values appear. `m`
+  keeps a random sample capped at `n = ⌈(12/ε²)·ln(3m/δ)⌉` entries, rounded up to
+  an even number (`O((1/ε²)·log(m/δ))` space), however many distinct values appear. `m`
   (`expectedSize`) enters only through a logarithm, so a rough upper bound is enough.
-- **`(ε, δ)` guarantee.** With probability at least `1 − δ`, the estimate is within
-  `±ε` of `F0`. That bound is a formally proved worst case, so in practice the
-  estimate is usually much closer than `ε`.
+- **`(ε, δ)` guarantee.** With probability at least `1 − δ`, the estimate differs
+  from `F0` by at most `ε·F0` — a relative error of at most `ε`. That bound is a
+  formally proved worst case; in practice the estimate is usually much closer.
 - **Total and unbiased.** The algorithm never fails (the rare `⊥` outcome some
-  versions can return), and its average result over many runs is exactly `F0`,
-  with no systematic over- or under-counting.
+  versions can return), and the expected value of its result is exactly `F0`:
+  no systematic over- or under-counting.
 
 **How much memory will this cost?** `computeThreshold(epsilon, delta, expectedSize)`
 takes the same three parameters from [Options](#options) and computes that
 capacity directly, so you can check the cost before running anything:
 
 ```js
-import { computeThreshold } from 'tallyish'
+import { computeThreshold } from 'faircount'
 
 computeThreshold(0.05, 0.01, 1_000_000)  // 93694
 computeThreshold(0.025, 0.01, 1_000_000) // 374772, about 4x: the threshold scales as 1/epsilon²
 ```
 
-This is the same number you'd see as `threshold` in a `CVM`'s `result()` after
-actually running it on a stream of about that size.
+This is the same number you'd see as `threshold` in the `result()` of a `CVM`
+constructed with the same parameters.
 
 ## Benchmarks
 

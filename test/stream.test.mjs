@@ -90,7 +90,7 @@ test('objectMode: false delivers Buffers, so the default keyFn cannot dedup them
   assert.equal(decoded.result().estimate, 3)
 })
 
-test('objectMode: false rejects values that are not strings or Buffers', () => {
+test('objectMode: false rejects a chunk that is not a string, Buffer, TypedArray, or DataView', () => {
   const counter = new DistinctEstimateStream({ epsilon: 0.5, expectedSize: 100, objectMode: false })
   assert.throws(() => counter.write(42), TypeError)
 })

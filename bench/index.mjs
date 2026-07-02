@@ -47,14 +47,20 @@ async function runScenario (scenario) {
   console.log(`\n=== ${scenario.name}: ${scenario.total.toLocaleString()} items, ~${scenario.unique.toLocaleString()} unique (ε=${scenario.epsilon}, δ=${scenario.delta}) ===`)
   // exact and cvm always run one after the other, never concurrently, so
   // neither run's measurement is skewed by the other contending for resources.
+  const estimates = {}
   for (const kind of /** @type {const} */(['exact', 'cvm'])) {
     try {
       const r = await runIsolated(kind, scenario)
+      estimates[kind] = Number(r.estimate)
       const label = kind === 'exact' ? 'EXACT (Set) ' : 'CVM estimate'
       console.log(`[${label}] distinct: ${r.estimate} | RAM: ${r.ram} MB | time: ${r.ms} ms`)
     } catch (e) {
       console.error(`error running '${kind}' for scenario '${scenario.name}':`, e instanceof Error ? e.message : e)
     }
+  }
+  if (estimates.exact && estimates.cvm) {
+    const pct = (Math.abs(estimates.cvm - estimates.exact) / estimates.exact) * 100
+    console.log(`[observed err ] ${pct.toFixed(2)}% (CVM vs exact)`)
   }
 }
 

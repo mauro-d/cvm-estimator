@@ -32,6 +32,16 @@ test('computeThreshold treats expectedSize 0 as 1 and grows as ε shrinks', () =
   assert.ok(computeThreshold(0.05, 0.01, 1000) > computeThreshold(0.25, 0.01, 1000))
 })
 
+test('computeThreshold validates its inputs', () => {
+  assert.throws(() => computeThreshold(0, 0.01, 100), RangeError)
+  assert.throws(() => computeThreshold(1, 0.01, 100), RangeError)
+  assert.throws(() => computeThreshold(0.05, 0, 100), RangeError)
+  assert.throws(() => computeThreshold(0.05, 1, 100), RangeError)
+  assert.throws(() => computeThreshold(0.05, 0.01, -1), RangeError)
+  assert.throws(() => computeThreshold(0.05, 0.01, Infinity), RangeError)
+  assert.throws(() => computeThreshold('0.05', 0.01, 100), RangeError)
+})
+
 test('constructor validates parameters', () => {
   assert.throws(() => new CVM({ epsilon: 0 }), RangeError)
   assert.throws(() => new CVM({ epsilon: 1 }), RangeError)
@@ -46,6 +56,15 @@ test('warns once when expectedSize is omitted', async () => {
   new CVM({ epsilon: 0.5, delta: 0.1 }) // eslint-disable-line no-new
   const warning = await seen
   assert.equal(warning.code, 'CVM_NO_EXPECTED_SIZE')
+
+  // Once per process: a second omission must stay silent.
+  let warnedAgain = false
+  const listener = () => { warnedAgain = true }
+  process.on('warning', listener)
+  new CVM({ epsilon: 0.5, delta: 0.1 }) // eslint-disable-line no-new
+  await new Promise((resolve) => setImmediate(resolve))
+  process.removeListener('warning', listener)
+  assert.equal(warnedAgain, false, 'warning must fire only once per process')
 })
 
 test('estimate is exact when F0 never exceeds the threshold', () => {

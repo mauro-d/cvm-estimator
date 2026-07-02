@@ -29,9 +29,9 @@ async function run () {
   if (global.gc) global.gc()
   const source = createTokenStream(scenario.total, scenario.unique, scenario.seed)
   // No fixed seed for the estimator: use the production default (Math.random) so
-  // the benchmark shows an honest, freshly-drawn estimate each run rather than a
-  // single repeated deterministic draw. The scenario's seed only fixes the
-  // synthetic workload, so it is comparable across the exact and cvm runs.
+  // the benchmark shows a freshly-drawn estimate each run rather than a single
+  // repeated deterministic draw. The scenario's seed only fixes the synthetic
+  // workload, so it is comparable across the exact and cvm runs.
   const sink = kind === 'cvm'
     ? new DistinctEstimateStream({ epsilon: scenario.epsilon, delta: scenario.delta, expectedSize: scenario.total })
     : new ExactDistinctStream()

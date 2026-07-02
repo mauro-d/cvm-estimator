@@ -10,6 +10,15 @@ let warnedNoExpectedSize = false
 // number so exactly n/2 elements are kept on each sub-sample. The dependence on
 // m is only logarithmic, so a rough upper bound is fine.
 export function computeThreshold (epsilon, delta, expectedSize) {
+  if (typeof epsilon !== 'number' || !(epsilon > 0 && epsilon < 1)) {
+    throw new RangeError(`epsilon must be a number in (0, 1), got ${epsilon}`)
+  }
+  if (typeof delta !== 'number' || !(delta > 0 && delta < 1)) {
+    throw new RangeError(`delta must be a number in (0, 1), got ${delta}`)
+  }
+  if (typeof expectedSize !== 'number' || !Number.isFinite(expectedSize) || expectedSize < 0) {
+    throw new RangeError(`expectedSize must be a non-negative finite number, got ${expectedSize}`)
+  }
   const m = expectedSize > 0 ? expectedSize : 1
   const n = Math.ceil((12 / (epsilon * epsilon)) * Math.log((3 * m) / delta))
   return Math.max(2, n + (n % 2))
@@ -30,25 +39,20 @@ export class CVM {
       random
     } = options
 
-    if (typeof epsilon !== 'number' || !(epsilon > 0 && epsilon < 1)) {
-      throw new RangeError(`epsilon must be a number in (0, 1), got ${epsilon}`)
-    }
-    if (typeof delta !== 'number' || !(delta > 0 && delta < 1)) {
-      throw new RangeError(`delta must be a number in (0, 1), got ${delta}`)
-    }
-    if (typeof expectedSize !== 'number' || !Number.isFinite(expectedSize) || expectedSize < 0) {
-      throw new RangeError(`expectedSize must be a non-negative finite number, got ${expectedSize}`)
-    }
     if (random !== undefined && typeof random !== 'function') {
       throw new TypeError('random must be a function returning a float in [0, 1)')
     }
+
+    // computeThreshold validates epsilon, delta and expectedSize, so an invalid
+    // parameter throws here, before the warning below can fire.
+    this.threshold = computeThreshold(epsilon, delta, expectedSize)
 
     // Optional, but omitting it sizes the threshold for a length-1 stream, which is
     // too small for the (ε, δ) guarantee on a real one. Warn once instead of failing.
     if (expectedSize === 0 && !warnedNoExpectedSize) {
       warnedNoExpectedSize = true
       process.emitWarning(
-        'tallyish: expectedSize was not set; the (ε, δ) guarantee assumes it bounds the stream length. Pass it to size the threshold correctly.',
+        'faircount: expectedSize was not set; the (ε, δ) guarantee assumes it bounds the stream length. Pass it to size the threshold correctly.',
         { code: 'CVM_NO_EXPECTED_SIZE' }
       )
     }
@@ -56,7 +60,6 @@ export class CVM {
     this.epsilon = epsilon
     this.delta = delta
     this.expectedSize = expectedSize
-    this.threshold = computeThreshold(epsilon, delta, expectedSize)
 
     this._keep = this.threshold / 2
     this._random = random ?? createRandom(seed)
@@ -80,7 +83,8 @@ export class CVM {
 
   // Keep a uniformly random n/2-subset of the buffer (partial Fisher–Yates:
   // shuffle the kept slots to the front, drop the rest). Each element is retained
-  // with probability exactly ½, which is what makes the estimator unbiased.
+  // with probability exactly ½, and once p is halved the estimate |X|/p is exactly
+  // what it was before the sub-sample.
   _subsample () {
     const arr = [...this._X]
     const keep = this._keep
